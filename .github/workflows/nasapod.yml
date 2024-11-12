@@ -1,0 +1,70 @@
+name: Nasapod
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 10 * * *'
+
+
+jobs:
+  tweet:
+    name: APOD
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+
+      - name: Keep this repo alive
+        uses: gautamkrishnar/keepalive-workflow@master
+
+      - name: Set up Python 🐍
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Cache Python packages 💾
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            ${{ runner.os }}-
+
+      - name: Install packages ⚙
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check if instagram_session exists
+        id: session-check
+        run: echo "::set-output name=exists::$(if [ -f instagram_session.json ]; then echo 'true'; else echo 'false'; fi)"
+
+      - name: Download Instagram Session
+        if: steps.session-check.outputs.exists == 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: instagram_session
+          path: .
+
+      - name: Create empty session file if not exists
+        if: steps.session-check.outputs.exists == 'false'
+        run: echo '{}' > instagram_session.json
+
+      - name: insta APOD 🐦📷
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          TELE_USER: ${{ secrets.TELE_USER }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          GOOGLE_API_KEY:  ${{ secrets.GOOGLE_API_KEY }}
+        run: python instasa.py
+
+      - name: Upload Instagram Session
+        uses: actions/upload-artifact@v3
+        with:
+          name: instagram_session
+          path: instagram_session.json
