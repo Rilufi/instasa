@@ -126,7 +126,7 @@ title = response.get('title')
 hashtags = "#NASA #APOD #Astronomy #Space #Astrophotography"
 
 # Combinar o título e a explicação em um único prompt
-prompt_combinado = f"Given the following scientific text from a reputable source (NASA) in English, translate it accurately and fluently into grammatically correct Brazilian Portuguese while preserving the scientific meaning. Also, based on the following text, create engaging astronomy related hashtags to be posted on Instagram. Make sure the response is in the format title - new line - explanation - new line - hashtags so it can be directly posted on Instagram:\n{title}\n\n{explanation}"
+prompt_combinado = f"Given the following scientific text from a reputable source (NASA) in English, translate it accurately and fluently into grammatically correct Brazilian Portuguese while preserving the scientific meaning. Also, based on the following text, create engaging astronomy related hashtags to be posted on Instagram. Make sure the response is in plain text format without subtitles so it can be directly posted on Instagram, e.g. title - new line - explanation - new line - hashtags:\n{title}\n\n{explanation}"
 
 # Gerar tradução combinada usando o modelo
 try:
