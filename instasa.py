@@ -15,6 +15,8 @@ from sys import exit
 api_key = os.environ.get("API_KEY")
 username = os.environ.get("USERNAME")
 password = os.environ.get("PASSWORD")
+usuario = os.environ.get("USUARIO")  # Nova conta
+senha = os.environ.get("SENHA")      # Nova conta
 tele_user = os.environ.get("TELE_USER")
 TOKEN = os.environ["TELEGRAM_TOKEN"]
 bot = telebot.TeleBot(TOKEN)
@@ -25,9 +27,9 @@ genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-pro')
 
 # Função para logar no Instagram com verificação de desafio
-def logar_instagram():
+def logar_instagram(username, password):
     cl = Client()
-    session_file = 'instagram_session.json'
+    session_file = f'instagram_session_{username}.json'
     try:
         if os.path.exists(session_file):
             cl.load_settings(session_file)
@@ -41,7 +43,8 @@ def logar_instagram():
     return cl
 
 try:
-    instagram_client = logar_instagram()
+    instagram_client = logar_instagram(username, password)
+    instagram_client_original = logar_instagram(usuario, senha)  # Logar na segunda conta
 except Exception as e:
     print(f"Erro ao logar no Instagram: {e}")
     bot.send_message(tele_user, f"Erro ao logar no Instagram: {e}")
@@ -109,7 +112,6 @@ def cortar_video(video_path, start_time, end_time, output_path):
         print(f"Erro ao cortar o vídeo: {e}")
         return None
 
-
 # Get the picture, explanation, and/or video thumbnail
 URL_APOD = "https://api.nasa.gov/planetary/apod"
 params = {
@@ -126,7 +128,6 @@ title = response.get('title')
 hashtags = "#NASA #APOD #Astronomy #Space #Astrophotography"
 
 # Combinar o título e a explicação em um único prompt
-
 prompt_combinado = f"""Given the following scientific text from a reputable source (NASA) in English, translate it accurately and fluently into grammatically correct Brazilian Portuguese while preserving the scientific meaning. Also, based on the following text, create engaging astronomy related hashtags. **Output the translated text and hashtags in a single string, separated by newlines, without headers or subtitles in the following format:**
 [Translated Title]
 [Translated Explanation]
@@ -145,7 +146,6 @@ try:
 {title}
 
 {traducao_combinada}"""
-
     else:
         raise AttributeError("A tradução combinada não foi gerada.")
 except AttributeError as e:
@@ -159,6 +159,13 @@ except AttributeError as e:
 
 print(insta_string)
 
+# Conteúdo original para a segunda conta
+insta_string_original = f"""Astronomy Picture of the Day
+{title}
+
+{explanation}
+
+#NASA #APOD #Astronomy #Space #Astrophotography"""
 
 if media_type == 'image':
     # Retrieve the image
@@ -169,6 +176,7 @@ if media_type == 'image':
     if instagram_client:
         try:
             post_instagram_photo(instagram_client, image, insta_string)
+            post_instagram_photo(instagram_client_original, image, insta_string_original)  # Postar na segunda conta
         except Exception as e:
             print(f"Erro ao postar foto no Instagram: {e}")
             bot.send_message(tele_user, 'apodinsta com problema pra postar imagem')
@@ -185,6 +193,7 @@ elif media_type == 'video':
             if instagram_client:
                 try:
                     post_instagram_video(instagram_client, video_file, insta_string)
+                    post_instagram_video(instagram_client_original, video_file, insta_string_original)  # Postar na segunda conta
                 except Exception as e:
                     print(f"Erro ao postar vídeo no Instagram: {e}")
                     bot.send_message(tele_user, 'apodinsta com problema pra postar video')
