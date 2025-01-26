@@ -1,4 +1,4 @@
-name: Nasapod
+name: Follower
 
 on:
   workflow_dispatch:
