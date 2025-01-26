@@ -62,6 +62,8 @@ jobs:
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
+          USUARIO: ${{ secrets.USUARIO }}
+          SENHA: ${{ secrets.SENHA }}
         run: python follow.py
 
       - name: Upload Instagram Session
