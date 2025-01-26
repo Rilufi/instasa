@@ -10,7 +10,7 @@ password = os.environ.get("PASSWORD")
 
 # Lista de hashtags relevantes para astronomia em português (sem o caractere #)
 HASHTAGS_ASTRONOMIA = [
-    "astronomia", "espaco", "universo", "ciencia", "telescopio",
+    "astronomia", "espaço", "universo", "ciencia", "telescopio",
     "estrelas", "planetario", "galaxia", "cosmos", "astrofotografia",
     "nasa", "esa", "cienciaespacial", "observatorio", "via-lactea"
 ]
@@ -31,11 +31,11 @@ def logar_instagram():
     return cl
 
 # Função para seguir contas e curtir postagens relacionadas às hashtags
-def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
+def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=5):  # Reduzido para 5 ações
     try:
         for hashtag in hashtags:
             print(f"Procurando posts com a hashtag: #{hashtag}")
-            posts = cl.hashtag_medias_recent(hashtag, amount=5)  # Busca posts recentes com a hashtag
+            posts = cl.hashtag_medias_recent(hashtag, amount=3)  # Reduzido para 3 posts por hashtag
 
             for post in posts:
                 user_id = post.user.pk
@@ -45,7 +45,7 @@ def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
                 if not friendship_status.following:  # Verifica se já está seguindo
                     cl.user_follow(user_id)
                     print(f"Seguindo usuário {post.user.username} (ID: {user_id})")
-                    time.sleep(random.uniform(10, 30))  # Espera aleatória para evitar bloqueio
+                    time.sleep(random.uniform(30, 60))  # Espera entre 30 e 60 segundos
                     max_acoes -= 1
 
                 # Verifica se a postagem já foi curtida
@@ -53,7 +53,7 @@ def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
                 if not media_info.has_liked:
                     cl.media_like(post.id)
                     print(f"Curtindo postagem {post.id} do usuário {post.user.username}")
-                    time.sleep(random.uniform(10, 30))  # Espera aleatória para evitar bloqueio
+                    time.sleep(random.uniform(30, 60))  # Espera entre 30 e 60 segundos
                     max_acoes -= 1
 
                 if max_acoes <= 0:
