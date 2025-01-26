@@ -39,12 +39,12 @@ def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
 
             for post in posts:
                 user_id = post.user.pk
-                user_info = cl.user_info(user_id)
 
-                # Verifica se a conta já está sendo seguida
-                if not user_info.friendship_status.following:
+                # Verifica o status de amizade (seguir ou não seguir)
+                friendship_status = cl.user_friendship(user_id)
+                if not friendship_status.following:  # Verifica se já está seguindo
                     cl.user_follow(user_id)
-                    print(f"Seguindo usuário {user_info.username} (ID: {user_id})")
+                    print(f"Seguindo usuário {post.user.username} (ID: {user_id})")
                     time.sleep(random.uniform(10, 30))  # Espera aleatória para evitar bloqueio
                     max_acoes -= 1
 
@@ -52,7 +52,7 @@ def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
                 media_info = cl.media_info(post.id)
                 if not media_info.has_liked:
                     cl.media_like(post.id)
-                    print(f"Curtindo postagem {post.id} do usuário {user_info.username}")
+                    print(f"Curtindo postagem {post.id} do usuário {post.user.username}")
                     time.sleep(random.uniform(10, 30))  # Espera aleatória para evitar bloqueio
                     max_acoes -= 1
 
