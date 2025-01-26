@@ -5,8 +5,8 @@ from instagrapi import Client
 import random
 
 # Autenticação
-username = os.environ.get("USERNAME")
-password = os.environ.get("PASSWORD")
+username = os.environ.get("USUARIO")
+password = os.environ.get("SENHA")
 
 # Lista de hashtags relevantes para astronomia em português (sem o caractere #)
 HASHTAGS_ASTRONOMIA = [
