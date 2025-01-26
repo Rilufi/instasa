@@ -8,11 +8,11 @@ import random
 username = os.environ.get("USERNAME")
 password = os.environ.get("PASSWORD")
 
-# Lista de hashtags relevantes para astronomia em português
+# Lista de hashtags relevantes para astronomia em português (sem o caractere #)
 HASHTAGS_ASTRONOMIA = [
-    "#astronomia", "#espaço", "#universo", "#ciencia", "#telescopio",
-    "#estrelas", "#planetario", "#galaxia", "#cosmos", "#astrofotografia",
-    "#nasa", "#esa", "#cienciaespacial", "#observatorio", "#via-lactea"
+    "astronomia", "espaco", "universo", "ciencia", "telescopio",
+    "estrelas", "planetario", "galaxia", "cosmos", "astrofotografia",
+    "nasa", "esa", "cienciaespacial", "observatorio", "via-lactea"
 ]
 
 # Função para logar no Instagram com verificação de desafio
@@ -34,7 +34,7 @@ def logar_instagram():
 def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
     try:
         for hashtag in hashtags:
-            print(f"Procurando posts com a hashtag: {hashtag}")
+            print(f"Procurando posts com a hashtag: #{hashtag}")
             posts = cl.hashtag_medias_recent(hashtag, amount=5)  # Busca posts recentes com a hashtag
 
             for post in posts:
