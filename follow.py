@@ -41,7 +41,7 @@ def seguir_e_curtir_hashtags(cl, hashtags, max_acoes=10):
                 user_id = post.user.pk
 
                 # Verifica o status de amizade (seguir ou não seguir)
-                friendship_status = cl.user_friendship(user_id)
+                friendship_status = cl.user_friendship_v1(user_id)
                 if not friendship_status.following:  # Verifica se já está seguindo
                     cl.user_follow(user_id)
                     print(f"Seguindo usuário {post.user.username} (ID: {user_id})")
