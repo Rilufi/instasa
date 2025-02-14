@@ -37,6 +37,7 @@ def logar_instagram(username, password, session_file):
             cl.dump_settings(session_file)
             print(f"Sessão salva em {session_file}")
         cl.get_timeline_feed()  # Verifica se o login foi bem-sucedido
+        return cl  # Retorna o cliente
     except Exception as e:
         print(f"Erro ao logar no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta erro ao logar no Instagram: {e}")
@@ -85,14 +86,17 @@ def post_instagram_video(cl, video_path, caption):
 
 # Função para gerar conteúdo traduzido usando o modelo GenAI
 def gerar_traducao(prompt):
-    response = model.generate_content(prompt)
-    if response.candidates and len(response.candidates) > 0:
-        if response.candidates[0].content.parts and len(response.candidates[0].content.parts) > 0:
-            return response.candidates[0].content.parts[0].text
+    try:
+        response = model.generate_content(prompt)
+        if response.candidates and len(response.candidates) > 0:
+            if response.candidates[0].content.parts and len(response.candidates[0].content.parts) > 0:
+                return response.candidates[0].content.parts[0].text
+            else:
+                print("Nenhuma parte de conteúdo encontrada na resposta.")
         else:
-            print("Nenhuma parte de conteúdo encontrada na resposta.")
-    else:
-        print("Nenhum candidato válido encontrado.")
+            print("Nenhum candidato válido encontrado.")
+    except Exception as e:
+        print(f"Erro ao gerar tradução com o Gemini: {e}")
     return None
 
 # Função para baixar o vídeo e retornar o nome do arquivo baixado
