@@ -38,26 +38,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Check if instagram_session exists
-        id: session-check
-        run: |
-          if [ -f instagram_session.json ]; then
-            echo "SESSION_EXISTS=true" >> $GITHUB_ENV
-          else
-            echo "SESSION_EXISTS=false" >> $GITHUB_ENV
-          fi
-
-      - name: Download Instagram Session
-        if: env.SESSION_EXISTS == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: instagram_session
-          path: .
-
-      - name: Create empty session file if not exists
-        if: env.SESSION_EXISTS == 'false'
-        run: echo '{}' > instagram_session.json
-
       - name: insta APOD 🐦📷
         env:
           API_KEY: ${{ secrets.API_KEY }}
@@ -68,10 +48,5 @@ jobs:
           TELE_USER: ${{ secrets.TELE_USER }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          INSTAGRAM_SESSION: ${{ secrets.INSTAGRAM_SESSION }}
         run: python instasa.py
-
-      - name: Upload Instagram Session
-        uses: actions/upload-artifact@v4
-        with:
-          name: instagram_session
-          path: instagram_session.json
