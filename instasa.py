@@ -15,8 +15,6 @@ from sys import exit
 api_key = os.environ.get("API_KEY")
 username = os.environ.get("USERNAME")
 password = os.environ.get("PASSWORD")
-usuario = os.environ.get("USUARIO")  # Nova conta
-senha = os.environ.get("SENHA")      # Nova conta
 tele_user = os.environ.get("TELE_USER")
 TOKEN = os.environ["TELEGRAM_TOKEN"]
 bot = telebot.TeleBot(TOKEN)
@@ -27,24 +25,41 @@ genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-pro')
 
 # Função para logar no Instagram com verificação de desafio
-def logar_instagram(username, password):
+def logar_instagram(username, password, session_file):
     cl = Client()
-    session_file = f'instagram_session_{username}.json'
     try:
         if os.path.exists(session_file):
+            # Carrega a sessão salva
             cl.load_settings(session_file)
-        cl.login(username, password)
-        cl.get_timeline_feed()
-        cl.dump_settings(session_file)
+        else:
+            # Faz login e salva a sessão
+            cl.login(username, password)
+            cl.dump_settings(session_file)
+            print(f"Sessão salva em {session_file}")
+        cl.get_timeline_feed()  # Verifica se o login foi bem-sucedido
     except Exception as e:
         print(f"Erro ao logar no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta erro ao logar no Instagram: {e}")
         exit()
-    return cl
 
+# Carrega a sessão a partir do segredo no GitHub Actions
+def load_session_from_secret(secret_name, session_file):
+    session_content = os.environ.get(secret_name)
+    if session_content:
+        with open(session_file, "w") as f:
+            f.write(session_content)
+        print(f"Sessão carregada a partir do segredo {secret_name}")
+    else:
+        raise ValueError(f"Segredo {secret_name} não encontrado.")
+
+# Nome do arquivo de sessão
+session_file = f"instagram_session_{username}.json"
+load_session_from_secret("INSTAGRAM_SESSION", session_file)
+
+# Tenta fazer login no Instagram
 try:
-    instagram_client = logar_instagram(username, password)
-    instagram_client_original = logar_instagram(usuario, senha)  # Logar na segunda conta
+    instagram_client = logar_instagram(username, password, session_file)
+    instagram_client_original = logar_instagram(usuario, senha, f"instagram_session_{usuario}.json")  # Logar na segunda conta
 except Exception as e:
     print(f"Erro ao logar no Instagram: {e}")
     bot.send_message(tele_user, f"Erro ao logar no Instagram: {e}")
@@ -176,7 +191,6 @@ if media_type == 'image':
     if instagram_client:
         try:
             post_instagram_photo(instagram_client, image, insta_string)
-            post_instagram_photo(instagram_client_original, image, insta_string_original)  # Postar na segunda conta
         except Exception as e:
             print(f"Erro ao postar foto no Instagram: {e}")
             bot.send_message(tele_user, 'apodinsta com problema pra postar imagem')
@@ -193,7 +207,6 @@ elif media_type == 'video':
             if instagram_client:
                 try:
                     post_instagram_video(instagram_client, video_file, insta_string)
-                    post_instagram_video(instagram_client_original, video_file, insta_string_original)  # Postar na segunda conta
                 except Exception as e:
                     print(f"Erro ao postar vídeo no Instagram: {e}")
                     bot.send_message(tele_user, 'apodinsta com problema pra postar video')
