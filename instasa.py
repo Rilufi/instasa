@@ -59,7 +59,6 @@ load_session_from_secret("INSTAGRAM_SESSION", session_file)
 # Tenta fazer login no Instagram
 try:
     instagram_client = logar_instagram(username, password, session_file)
-    instagram_client_original = logar_instagram(usuario, senha, f"instagram_session_{usuario}.json")  # Logar na segunda conta
 except Exception as e:
     print(f"Erro ao logar no Instagram: {e}")
     bot.send_message(tele_user, f"Erro ao logar no Instagram: {e}")
@@ -173,14 +172,6 @@ except AttributeError as e:
 #NASA #APOD #Astronomia #Espaço #Astrofotografia"""
 
 print(insta_string)
-
-# Conteúdo original para a segunda conta
-insta_string_original = f"""Astronomy Picture of the Day
-{title}
-
-{explanation}
-
-#NASA #APOD #Astronomy #Space #Astrophotography"""
 
 if media_type == 'image':
     # Retrieve the image
