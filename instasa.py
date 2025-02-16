@@ -6,7 +6,6 @@ import google.generativeai as genai
 from instagrapi import Client
 import telebot
 from pytube import YouTube
-from pytube.request import default_headers  # Adicionado para headers personalizados
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import random
 import time
@@ -22,10 +21,11 @@ bot = telebot.TeleBot(TOKEN)
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Atualiza os headers padrão para simular um navegador
-default_headers.update({
+# Define headers personalizados para o pytube
+headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-})
+}
+YouTube.headers = headers
 
 # Choose a GenAI model (e.g., 'gemini-pro')
 model = genai.GenerativeModel('gemini-pro')
