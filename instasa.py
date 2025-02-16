@@ -5,7 +5,7 @@ import requests
 import google.generativeai as genai
 from instagrapi import Client
 import telebot
-from pytube import YouTube
+from yt_dlp import YoutubeDL  # Substituído pytube por yt-dlp
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import random
 import time
@@ -20,12 +20,6 @@ TOKEN = os.environ["TELEGRAM_TOKEN"]
 bot = telebot.TeleBot(TOKEN)
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
-
-# Define headers personalizados para o pytube
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-}
-YouTube.headers = headers
 
 # Choose a GenAI model (e.g., 'gemini-pro')
 model = genai.GenerativeModel('gemini-pro')
@@ -105,22 +99,20 @@ def gerar_traducao(prompt):
         print(f"Erro ao gerar tradução com o Gemini: {e}")
     return None
 
-# Função para baixar o vídeo e retornar o nome do arquivo baixado
+# Função para baixar o vídeo usando yt-dlp
 def download_video(link):
     try:
-        youtube_object = YouTube(link)
-        video_stream = youtube_object.streams.get_highest_resolution()
-        if video_stream:
-            video_filename = video_stream.default_filename
-            video_stream.download()
-            time.sleep(random.uniform(1, 5))  # Espera aleatória para evitar sobrecarga de rede
-            return video_filename  # Retorna o nome do arquivo do vídeo baixado
-        else:
-            print("Nenhuma stream encontrada para o vídeo.")
-            return None
+        ydl_opts = {
+            'format': 'best',  # Baixa o vídeo na melhor qualidade disponível
+            'outtmpl': '%(title)s.%(ext)s',  # Define o nome do arquivo de saída
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(link, download=True)
+            video_filename = ydl.prepare_filename(info_dict)
+            return video_filename
     except Exception as e:
         print(f"Erro ao baixar o vídeo: {e}")
-        return None  # Retorna None se o download falhar
+        return None
 
 # Função para cortar o vídeo
 def cortar_video(video_path, start_time, end_time, output_path):
