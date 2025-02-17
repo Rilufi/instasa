@@ -99,12 +99,13 @@ def gerar_traducao(prompt):
         print(f"Erro ao gerar tradução com o Gemini: {e}")
     return None
 
-# Função para baixar o vídeo usando yt-dlp
+# Função para baixar o vídeo usando yt-dlp com cookies
 def download_video(link):
     try:
         ydl_opts = {
             'format': 'best',  # Baixa o vídeo na melhor qualidade disponível
             'outtmpl': '%(title)s.%(ext)s',  # Define o nome do arquivo de saída
+            'cookiefile': 'cookies.txt',  # Usa o arquivo de cookies
         }
         with YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(link, download=True)
