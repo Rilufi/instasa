@@ -100,14 +100,16 @@ def gerar_traducao(prompt):
     return None
 
 # Função para baixar o vídeo usando yt-dlp com cookies
-def download_video(link):
+def download_video(link, cookies_content):
     try:
         ydl_opts = {
             'format': 'best',  # Baixa o vídeo na melhor qualidade disponível
             'outtmpl': '%(title)s.%(ext)s',  # Define o nome do arquivo de saída
-            'cookiefile': 'cookies.txt',  # Usa o arquivo de cookies
+            'cookiefile': '-',  # Usa os cookies diretamente da string
         }
         with YoutubeDL(ydl_opts) as ydl:
+            # Passa os cookies diretamente como uma string
+            ydl.cookiefile = cookies_content
             info_dict = ydl.extract_info(link, download=True)
             video_filename = ydl.prepare_filename(info_dict)
             return video_filename
@@ -136,13 +138,24 @@ params = {
     'hd': 'True',
     'thumbs': 'True'
 }
-response = requests.get(URL_APOD, params=params).json()
-site = response.get('url')
-thumbs = response.get('thumbnail_url')
-media_type = response.get('media_type')
-explanation = response.get('explanation')
-title = response.get('title')
-hashtags = "#NASA #APOD #Astronomy #Space #Astrophotography"
+
+try:
+    response = requests.get(URL_APOD, params=params)
+    response.raise_for_status()  # Verifica se a requisição foi bem-sucedida
+    data = response.json()
+    site = data.get('url')
+    thumbs = data.get('thumbnail_url')
+    media_type = data.get('media_type')
+    explanation = data.get('explanation')
+    title = data.get('title')
+except requests.exceptions.RequestException as e:
+    print(f"Erro ao acessar a API da NASA: {e}")
+    bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
+    exit()
+except ValueError as e:
+    print(f"Erro ao decodificar a resposta da API da NASA: {e}")
+    bot.send_message(tele_user, f"Erro ao decodificar a resposta da API da NASA: {e}")
+    exit()
 
 # Combinar o título e a explicação em um único prompt
 prompt_combinado = f"""Given the following scientific text from a reputable source (NASA) in English, translate it accurately and fluently into grammatically correct Brazilian Portuguese while preserving the scientific meaning. Also, based on the following text, create engaging astronomy related hashtags. **Output the translated text and hashtags in a single string, separated by newlines, without headers or subtitles in the following format:**
@@ -191,7 +204,13 @@ if media_type == 'image':
 
 elif media_type == 'video':
     # Retrieve the video
-    video_file = download_video(site)
+    cookies_content = os.environ.get("COOKIES_CONTENT")  # Carrega os cookies dos segredos
+    if not cookies_content:
+        print("Cookies não encontrados nos segredos.")
+        bot.send_message(tele_user, 'Cookies não encontrados nos segredos.')
+        exit()
+
+    video_file = download_video(site, cookies_content)
     
     if video_file:
         video_file_cortado = cortar_video(video_file, 0, 60, "video_cortado.mp4")
