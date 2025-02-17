@@ -49,4 +49,6 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           INSTAGRAM_SESSION: ${{ secrets.INSTAGRAM_SESSION }}
-        run: python instasa.py
+        run: |
+          echo "$COOKIES_CONTENT" > cookies.txt
+          python instasa.py
