@@ -6,14 +6,13 @@ import google.generativeai as genai
 from instagrapi import Client
 import telebot
 from yt_dlp import YoutubeDL
-from moviepy.video.io.VideoFileClip import VideoFileClip
 import random
 import time
 from sys import exit
 from bs4 import BeautifulSoup
+import subprocess
 
-
-# Authentication
+# Configurações de autenticação
 api_key = os.environ.get("API_KEY")
 username = os.environ.get("USERNAME")
 password = os.environ.get("PASSWORD")
@@ -23,8 +22,96 @@ bot = telebot.TeleBot(TOKEN)
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Choose a GenAI model
+# Modelo GenAI
 model = genai.GenerativeModel('gemini-2.0-flash-lite')
+
+def get_video_duration(video_path):
+    """Obtém a duração do vídeo usando FFprobe"""
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            video_path
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return float(result.stdout.strip())
+    except Exception as e:
+        print(f"Erro ao obter duração do vídeo: {e}")
+        return 0
+
+def process_video(input_path, output_path="instagram_ready.mp4", max_duration=60):
+    """Processa vídeo para o Instagram usando FFmpeg"""
+    try:
+        duration = get_video_duration(input_path)
+        
+        if duration <= max_duration:
+            # Copia o vídeo sem re-encode se já estiver dentro do limite
+            cmd = [
+                'ffmpeg', '-i', input_path,
+                '-c', 'copy',
+                output_path
+            ]
+        else:
+            # Corta e converte para formato otimizado
+            cmd = [
+                'ffmpeg', '-i', input_path,
+                '-t', str(max_duration),
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+                '-c:a', 'aac', '-b:a', '128k',
+                '-vf', 'scale=1080:-2',  # Mantém aspect ratio com largura 1080
+                '-movflags', '+faststart',
+                output_path
+            ]
+        
+        subprocess.run(cmd, check=True)
+        return output_path
+    except Exception as e:
+        print(f"Erro ao processar vídeo: {e}")
+        return None
+
+def post_instagram_video(cl, video_path, caption):
+    """Posta vídeo no Instagram com tratamento robusto"""
+    try:
+        time.sleep(random.uniform(30, 60))
+        processed_path = process_video(video_path)
+        
+        if processed_path:
+            cl.video_upload(
+                processed_path,
+                caption=caption,
+                extra_data={
+                    "configure_mode": 2,  # 2=FEED
+                    "source_type": 4,
+                    "video_format": "mp4",
+                    "length": min(get_video_duration(processed_path), 60)
+                }
+            )
+            print("Vídeo publicado no Instagram")
+        else:
+            raise ValueError("Falha no processamento do vídeo")
+    except Exception as e:
+        print(f"Erro ao postar vídeo no Instagram: {e}")
+        bot.send_message(tele_user, f"Erro ao postar vídeo: {e}")
+
+def download_direct_video(video_url, filename='apod_direct.mp4'):
+    """Baixa vídeo diretamente da NASA"""
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        
+        if video_url.startswith('/'):
+            video_url = f'https://apod.nasa.gov{video_url}'
+        
+        print(f"Baixando vídeo: {video_url}")
+        with requests.get(video_url, stream=True, headers=headers) as r:
+            r.raise_for_status()
+            with open(filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return filename
+    except Exception as e:
+        print(f"Erro ao baixar vídeo: {e}")
+        return None
 
 def logar_instagram(username, password, session_file):
     cl = Client()
@@ -68,38 +155,6 @@ def post_instagram_photo(cl, image_path, caption):
     except Exception as e:
         print(f"Erro ao postar foto no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta com problema pra postar: {e}")
-
-def post_instagram_video(cl, video_path, caption):
-    try:
-        time.sleep(random.uniform(30, 60))
-        
-        # Verifica a duração do vídeo
-        with VideoFileClip(video_path) as video:
-            duration = video.duration
-            
-            # Se o vídeo já tiver menos de 60s, usa-o diretamente
-            if duration <= 60:
-                output_path = video_path
-            else:
-                output_path = "instagram_video.mp4"
-                # Método alternativo para cortar vídeo
-                cmd = f"ffmpeg -i {video_path} -ss 0 -t 60 -c:v libx264 -c:a aac -strict experimental {output_path}"
-                os.system(cmd)
-        
-        cl.video_upload(
-            output_path,
-            caption=caption,
-            extra_data={
-                "configure_mode": 2,
-                "source_type": 4,
-                "video_format": "mp4",
-                "length": min(duration, 60)
-            }
-        )
-        print("Vídeo publicado no Instagram")
-    except Exception as e:
-        print(f"Erro ao postar vídeo no Instagram: {e}")
-        bot.send_message(tele_user, f"Erro ao postar vídeo: {e}")
 
 def gerar_traducao(prompt):
     try:
@@ -155,29 +210,6 @@ def extract_video_url_from_html(apod_url):
         print(f"Erro ao extrair URL do vídeo: {e}")
         return None
 
-def download_direct_video(video_url, filename='apod_direct.mp4'):
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        # Verifica se a URL é relativa (começa com /)
-        if video_url.startswith('/'):
-            video_url = f'https://apod.nasa.gov{video_url}'
-        
-        print(f"Tentando baixar vídeo direto de: {video_url}")
-        
-        with requests.get(video_url, stream=True, headers=headers) as r:
-            r.raise_for_status()
-            with open(filename, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        return filename
-    except Exception as e:
-        print(f"Erro ao baixar vídeo direto: {e}")
-        return None
-
-
 def detect_media_type(data):
     media_type = data.get('media_type', '').lower()
     url = data.get('url', '')
@@ -227,7 +259,6 @@ def get_apod_data(api_key):
         print(f"Erro ao acessar a API da NASA: {e}")
         raise
 
-# Atualize a chamada para obter os dados
 try:
     data = get_apod_data(api_key)
     debug_api_data(data)
@@ -236,101 +267,32 @@ try:
     media_type = detect_media_type(data)
     explanation = data.get('explanation')
     title = data.get('title')
-except Exception as e:
-    print(f"Erro ao obter dados do APOD: {e}")
-    bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
-    exit()
 
+    # Geração da legenda (mantida igual)
+    insta_string = generate_caption(title, explanation)
 
-# Gerar legenda
-try:
-    prompt = f"""Traduza para português brasileiro e adicione hashtags:
-    {title}
-    {explanation}"""
-    
-    traducao = gerar_traducao(prompt) or f"{title}\n\n{explanation}"
-    insta_string = f"Foto Astronômica do Dia\n\n{traducao}"
-except Exception as e:
-    print(f"Erro ao gerar tradução: {e}")
-    insta_string = f"Foto Astronômica do Dia\n\n{title}\n\n{explanation}"
-
-print(f"\nLegenda gerada:\n{insta_string}")
-
-# Processar mídia
-if media_type == 'image':
-    try:
+    # Processamento de mídia
+    if media_type == 'image':
         urllib.request.urlretrieve(site, 'apodtoday.jpg')
         if instagram_client:
             post_instagram_photo(instagram_client, 'apodtoday.jpg', insta_string)
-    except Exception as e:
-        print(f"Erro ao processar imagem: {e}")
-        bot.send_message(tele_user, f"Erro ao postar imagem: {e}")
-
-elif media_type in ['video', 'direct_video']:
-    try:
-        if media_type == 'direct_video':
-            video_path = download_direct_video(site)
-        else:
-            cookies = os.environ.get("COOKIES_CONTENT")
-            if not cookies:
-                raise ValueError("Cookies não encontrados")
-            video_path = download_video(site, cookies)
+    
+    elif media_type in ['video', 'html_video']:
+        video_url = site if media_type == 'video' else extract_video_url_from_html(site)
         
-        if video_path:
-            # Processar vídeo para o Instagram
-            output_path = "instagram_ready.mp4"
-            with VideoFileClip(video_path) as video:
-                duration = min(video.duration, 60)
-                video_cropped = video.subclip(0, duration)
-                video_cropped.write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    bitrate="8000k",
-                    fps=30,
-                    preset="fast",
-                    threads=4
-                )
-            
-            if instagram_client:
-                post_instagram_video(instagram_client, output_path, insta_string)
-    except Exception as e:
-        print(f"Erro ao processar vídeo: {e}")
-        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {e}')
-
-elif media_type == 'html_video':
-    try:
-        video_url = extract_video_url_from_html(site)
         if video_url:
-            print(f"URL do vídeo extraída: {video_url}")
-            
             if 'youtube' in video_url:
                 cookies = os.environ.get("COOKIES_CONTENT")
-                if not cookies:
-                    raise ValueError("Cookies não encontrados")
-                video_path = download_video(video_url, cookies)
+                video_path = download_video(video_url, cookies) if cookies else None
             else:
                 video_path = download_direct_video(video_url)
             
-            if video_path:
-                # Verifica se o vídeo precisa ser processado
-                with VideoFileClip(video_path) as video:
-                    duration = video.duration
-                    
-                    if duration > 60:
-                        output_path = "instagram_ready.mp4"
-                        # Usa FFmpeg diretamente para cortar
-                        cmd = f"ffmpeg -i {video_path} -ss 0 -t 60 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 128k {output_path}"
-                        os.system(cmd)
-                    else:
-                        output_path = video_path
-                
-                if instagram_client:
-                    post_instagram_video(instagram_client, output_path, insta_string)
-    except Exception as e:
-        print(f"Erro ao processar vídeo: {e}")
-        bot.send_message(tele_user, f'Erro ao processar vídeo: {e}')
-else:
-    msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
-    print(msg)
-    bot.send_message(tele_user, msg)
+            if video_path and instagram_client:
+                post_instagram_video(instagram_client, video_path, insta_string)
+    
+    else:
+        print(f"Tipo de mídia não suportado: {media_type}")
+
+except Exception as e:
+    print(f"Erro no processamento principal: {e}")
+    bot.send_message(tele_user, f"Erro: {e}")
