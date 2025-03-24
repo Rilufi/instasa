@@ -10,7 +10,7 @@ jobs:
     name: APOD
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Permissão para commits do keepalive
+      contents: write
 
     steps:
       - name: Checkout 🛎
@@ -23,6 +23,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.x
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Cache Python packages 💾
         uses: actions/cache@v4
@@ -49,6 +54,6 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           INSTAGRAM_SESSION: ${{ secrets.INSTAGRAM_SESSION }}
-          COOKIES_CONTENT: ${{ secrets.COOKIES_CONTENT }}  # Carrega os cookies dos segredos
+          COOKIES_CONTENT: ${{ secrets.COOKIES_CONTENT }}
         run: |
           python instasa.py
