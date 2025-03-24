@@ -6,7 +6,7 @@ import google.generativeai as genai
 from instagrapi import Client
 import telebot
 from yt_dlp import YoutubeDL
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 import random
 import time
 from sys import exit
