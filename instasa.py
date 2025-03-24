@@ -269,7 +269,17 @@ try:
     title = data.get('title')
 
     # Geração da legenda (mantida igual)
-    insta_string = generate_caption(title, explanation)
+    # Gerar legenda
+    try:
+        prompt = f"""Traduza para português brasileiro e adicione hashtags:
+        {title}
+        {explanation}"""
+        traducao = gerar_traducao(prompt) or f"{title}\n\n{explanation}"
+        insta_string = f"Foto Astronômica do Dia\n\n{traducao}"
+    except Exception as e:
+        print(f"Erro ao gerar tradução: {e}")
+        insta_string = f"Foto Astronômica do Dia\n\n{title}\n\n{explanation}"
+    print(f"\nLegenda gerada:\n{insta_string}")
 
     # Processamento de mídia
     if media_type == 'image':
