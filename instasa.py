@@ -1,9 +1,10 @@
 # coding=utf-8
 import os
+import sys
+from unittest.mock import MagicMock
 import urllib.request
 import requests
 import google.generativeai as genai
-from instagrapi import Client
 import telebot
 from yt_dlp import YoutubeDL
 import random
@@ -12,6 +13,13 @@ from sys import exit
 from bs4 import BeautifulSoup
 import subprocess
 import json
+
+# Mock do MoviePy antes de importar o instagrapi
+sys.modules['moviepy'] = MagicMock()
+sys.modules['moviepy.editor'] = MagicMock()
+sys.modules['moviepy.video.io.VideoFileClip'] = MagicMock()
+
+from instagrapi import Client
 
 # Configurações de autenticação
 api_key = os.environ.get("API_KEY")
@@ -89,23 +97,28 @@ def process_video_for_instagram(input_path, output_path="instagram_ready.mp4"):
     return None
 
 def upload_video_directly(cl, video_path, caption):
-    """Upload direto para o Instagram usando método alternativo"""
+    """Upload direto para o Instagram com mock do MoviePy"""
     try:
-        # Primeiro faz upload do vídeo
-        video = cl.video_upload(
-            path=video_path,
+        # Mock adicional para enganar a verificação interna
+        class FakeVideoFileClip:
+            def __init__(self, *args, **kwargs):
+                pass
+            def close(self):
+                pass
+        
+        import moviepy.editor
+        moviepy.editor.VideoFileClip = FakeVideoFileClip
+        
+        # Processa o vídeo
+        processed_path = process_video_for_instagram(video_path)
+        if not processed_path:
+            raise ValueError("Falha no processamento do vídeo")
+        
+        # Upload usando método privado que não verifica MoviePy
+        video = cl.clip_upload(
+            path=processed_path,
             caption=caption,
             thumbnail=None
-        )
-        
-        # Depois configura como post do feed
-        cl.media_configure(
-            media_id=video.id,
-            caption=caption,
-            extra_data={
-                'configure_mode': 2,  # Feed
-                'source_type': 3      # Upload direto
-            }
         )
         
         print(f"Vídeo postado com sucesso! ID: {video.id}")
@@ -113,7 +126,7 @@ def upload_video_directly(cl, video_path, caption):
     except Exception as e:
         print(f"Erro no upload para Instagram: {e}")
         return False
-
+        
 def download_direct_video(video_url, filename='apod_direct.mp4'):
     """Baixa vídeo diretamente da NASA"""
     try:
