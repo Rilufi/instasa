@@ -22,7 +22,7 @@ GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Choose a GenAI model (e.g., 'gemini-pro')
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-2.0-flash-lite')
 
 # Função para logar no Instagram com verificação de desafio
 def logar_instagram(username, password, session_file):
