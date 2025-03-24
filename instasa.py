@@ -6,8 +6,7 @@ import google.generativeai as genai
 from instagrapi import Client
 import telebot
 from yt_dlp import YoutubeDL  # Substituído pytube por yt-dlp
-from moviepy.video.io.VideoFileClip import VideoFileClip
-import random
+from moviepy.editor import VideoFileClip
 import time
 from sys import exit
 
@@ -75,14 +74,43 @@ def post_instagram_photo(cl, image_path, caption):
         bot.send_message(tele_user, f"apodinsta com problema pra postar: {e}")
 
 # Função para postar vídeo no Instagram
+# Função para postar vídeo no Instagram com tratamento melhorado
 def post_instagram_video(cl, video_path, caption):
     try:
-        time.sleep(random.uniform(30, 60))  # Espera aleatória antes de postar
-        cl.video_upload(video_path, caption)
+        time.sleep(random.uniform(30, 60))
+        
+        # Verifica se o vídeo atende aos requisitos do Instagram
+        with VideoFileClip(video_path) as video:
+            duration = video.duration
+            if duration > 60:  # Instagram permite até 60 segundos no feed
+                output_path = "video_instagram.mp4"
+                video_cortado = video.subclip(0, 60)
+                video_cortado.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    fps=30,
+                    threads=4
+                )
+                video_path = output_path
+        
+        # Configurações recomendadas para upload no Instagram
+        cl.video_upload(
+            video_path,
+            caption=caption,
+            thumbnail=None,  # Pode adicionar um frame específico como thumbnail
+            extra_data={
+                "configure_mode": 1,  # 1=REEL, 2=FEED
+                "source_type": 4,     # 4=Library
+                "video_format": "mp4",
+                "length": duration if duration <= 60 else 60
+            }
+        )
         print("Vídeo publicado no Instagram")
     except Exception as e:
         print(f"Erro ao postar vídeo no Instagram: {e}")
-        bot.send_message(tele_user, f"apodinsta com problema pra postar: {e}")
+        bot.send_message(tele_user, f"apodinsta com problema pra postar vídeo: {e}")
+        raise  # Re-lança a exceção para debug
 
 # Função para gerar conteúdo traduzido usando o modelo GenAI
 def gerar_traducao(prompt):
@@ -202,28 +230,46 @@ if media_type == 'image':
             print(f"Erro ao postar foto no Instagram: {e}")
             bot.send_message(tele_user, 'apodinsta com problema pra postar imagem')
 
-elif media_type == 'video':
-    # Retrieve the video
-    cookies_content = os.environ.get("COOKIES_CONTENT")  # Carrega os cookies dos segredos
-    if not cookies_content:
-        print("Cookies não encontrados nos segredos.")
-        bot.send_message(tele_user, 'Cookies não encontrados nos segredos.')
-        exit()
+elif media_type in ['video', 'youtube', 'vimeo', 'gif']:  # Adiciona mais tipos de vídeo
+    try:
+        cookies_content = os.environ.get("COOKIES_CONTENT")
+        if not cookies_content:
+            print("Cookies não encontrados nos segredos.")
+            bot.send_message(tele_user, 'Cookies não encontrados nos segredos.')
+            exit()
 
-    video_file = download_video(site, cookies_content)
-    
-    if video_file:
-        video_file_cortado = cortar_video(video_file, 0, 60, "video_cortado.mp4")
-        if video_file_cortado:
-            video_file = video_file_cortado
-            # Post the video on Instagram
+        # Baixa o vídeo
+        video_file = download_video(site, cookies_content)
+        
+        if video_file:
+            # Prepara o vídeo para o Instagram
+            output_path = "instagram_ready.mp4"
+            
+            with VideoFileClip(video_file) as video:
+                # Reduz a duração para até 60 segundos
+                duration = min(video.duration, 60)
+                
+                # Redimensiona se necessário (Instagram prefere 1080x1350, 1080x1080, ou 1080x1920)
+                video_cropped = video.subclip(0, duration)
+                
+                # Escreve o vídeo no formato adequado
+                video_cropped.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    bitrate="8000k",
+                    fps=30,
+                    preset="fast",
+                    threads=4
+                )
+            
+            # Posta no Instagram
             if instagram_client:
-                try:
-                    post_instagram_video(instagram_client, video_file, insta_string)
-                except Exception as e:
-                    print(f"Erro ao postar vídeo no Instagram: {e}")
-                    bot.send_message(tele_user, 'apodinsta com problema pra postar video')
-
+                post_instagram_video(instagram_client, output_path, insta_string)
+                
+    except Exception as e:
+        print(f"Erro ao processar vídeo: {e}")
+        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {e}')
 else:
-    print("Tipo de mídia inválido.")
-    bot.send_message(tele_user, 'Problema com o tipo de mídia no APOD')
+    print(f"Tipo de mídia não suportado: {media_type}")
+    bot.send_message(tele_user, f'Tipo de mídia não suportado: {media_type}')
