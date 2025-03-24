@@ -88,24 +88,27 @@ def process_video_for_instagram(input_path, output_path="instagram_ready.mp4"):
         return output_path
     return None
 
-def upload_video_to_instagram(cl, video_path, caption):
-    """Upload direto para o Instagram"""
+def upload_video_directly(cl, video_path, caption):
+    """Upload direto para o Instagram usando método alternativo"""
     try:
-        processed_path = process_video_for_instagram(video_path)
-        if not processed_path:
-            raise ValueError("Falha no processamento do vídeo")
-        
-        # Configuração alternativa de upload
-        media = cl.clip_upload(
-            path=processed_path,
+        # Primeiro faz upload do vídeo
+        video = cl.video_upload(
+            path=video_path,
             caption=caption,
-            thumbnail=None,
+            thumbnail=None
+        )
+        
+        # Depois configura como post do feed
+        cl.media_configure(
+            media_id=video.id,
+            caption=caption,
             extra_data={
                 'configure_mode': 2,  # Feed
                 'source_type': 3      # Upload direto
             }
         )
-        print(f"Vídeo postado com sucesso! ID: {media.id}")
+        
+        print(f"Vídeo postado com sucesso! ID: {video.id}")
         return True
     except Exception as e:
         print(f"Erro no upload para Instagram: {e}")
@@ -310,7 +313,7 @@ try:
                 video_path = download_direct_video(video_url)
             
             if video_path and instagram_client:
-                upload_video_to_instagram(instagram_client, video_path, insta_string)
+                upload_video_directly(instagram_client, video_path, insta_string)
     
     else:
         msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
