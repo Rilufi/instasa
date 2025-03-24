@@ -159,6 +159,25 @@ def cortar_video(video_path, start_time, end_time, output_path):
         print(f"Erro ao cortar o vídeo: {e}")
         return None
 
+def detect_media_type(data):
+    # Primeiro verifica o campo media_type oficial
+    media_type = data.get('media_type', '')
+    
+    # Se for um tipo conhecido, retorna
+    if media_type in ['image', 'video']:
+        return media_type
+    
+    # Caso contrário, analisa a URL
+    url = data.get('url', '')
+    if any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']):
+        return 'image'
+    elif any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.youtube', 'youtu.be']):
+        return 'video'
+    elif 'thumbnail_url' in data:  # Se tiver thumbnail, provavelmente é vídeo
+        return 'video'
+    
+    return 'other'
+
 # Get the picture, explanation, and/or video thumbnail
 URL_APOD = "https://api.nasa.gov/planetary/apod"
 params = {
@@ -216,6 +235,8 @@ except AttributeError as e:
 #NASA #APOD #Astronomia #Espaço #Astrofotografia"""
 
 print(insta_string)
+
+media_type = detect_media_type(data)
 
 if media_type == 'image':
     # Retrieve the image
