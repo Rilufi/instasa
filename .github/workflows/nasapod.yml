@@ -24,10 +24,8 @@ jobs:
         with:
           python-version: 3.x
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Cache Python packages 💾
         uses: actions/cache@v4
