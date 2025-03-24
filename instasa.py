@@ -153,15 +153,51 @@ def extract_video_url_from_html(apod_url):
         print(f"Erro ao extrair URL do vídeo: {e}")
         return None
 
+def get_apod_data(api_key):
+    base_url = "https://api.nasa.gov/planetary/apod"
+    params = {'api_key': api_key, 'hd': 'True', 'thumbs': 'True'}
+    
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Se não houver URL mas o media_type for 'other', construímos a URL manualmente
+        if not data.get('url') and data.get('media_type') == 'other':
+            apod_date = data.get('date', '')
+            if apod_date:
+                data['url'] = f"https://apod.nasa.gov/apod/ap{apod_date.replace('-', '')[2:]}.html"
+            else:
+                data['url'] = "https://apod.nasa.gov/apod/astropix.html"
+        
+        return data
+    except Exception as e:
+        print(f"Erro ao acessar a API da NASA: {e}")
+        raise
+
+# Atualize a chamada para obter os dados
+try:
+    data = get_apod_data(api_key)
+    debug_api_data(data)
+    
+    site = data.get('url')
+    media_type = detect_media_type(data)
+    explanation = data.get('explanation')
+    title = data.get('title')
+except Exception as e:
+    print(f"Erro ao obter dados do APOD: {e}")
+    bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
+    exit()
+
 def detect_media_type(data):
     media_type = data.get('media_type', '').lower()
     url = data.get('url', '')
     
-    # Caso especial para páginas HTML
-    if url and 'astropix.html' in url:
+    # Se for 'other' mas temos uma URL HTML, assumimos que é vídeo
+    if media_type == 'other' and url and ('apod.nasa.gov/apod' in url and '.html' in url):
         return 'html_video'
     
-    # Restante da detecção permanece igual...
+    # Restante da detecção normal...
     if (media_type == 'video' or 
         (url and any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm'])) or
         'thumbnail_url' in data):
@@ -171,35 +207,7 @@ def detect_media_type(data):
         (url and any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']))):
         return 'image'
     
-    return 'other'
-
-# Debug: Mostrar dados recebidos da API
-def debug_api_data(data):
-    print("\nDEBUG - Dados da API:")
-    print(f"URL: {data.get('url')}")
-    print(f"Media Type: {data.get('media_type')}")
-    print(f"Thumbnail: {data.get('thumbnail_url')}")
-    print(f"Title: {data.get('title')}")
-
-# Obter dados do APOD
-try:
-    response = requests.get("https://api.nasa.gov/planetary/apod", params={
-        'api_key': api_key,
-        'hd': 'True',
-        'thumbs': 'True'
-    })
-    response.raise_for_status()
-    data = response.json()
-    debug_api_data(data)  # Debug
-    
-    site = data.get('url')
-    media_type = detect_media_type(data)
-    explanation = data.get('explanation')
-    title = data.get('title')
-except Exception as e:
-    print(f"Erro ao acessar a API da NASA: {e}")
-    bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
-    exit()
+    return 'unsupported'
 
 # Gerar legenda
 try:
