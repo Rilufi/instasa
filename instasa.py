@@ -153,6 +153,13 @@ def extract_video_url_from_html(apod_url):
         print(f"Erro ao extrair URL do vídeo: {e}")
         return None
 
+def debug_api_data(data):
+    print("\nDEBUG - Dados da API:")
+    print(f"URL: {data.get('url')}")
+    print(f"Media Type: {data.get('media_type')}")
+    print(f"Thumbnail: {data.get('thumbnail_url')}")
+    print(f"Title: {data.get('title')}")
+
 def get_apod_data(api_key):
     base_url = "https://api.nasa.gov/planetary/apod"
     params = {'api_key': api_key, 'hd': 'True', 'thumbs': 'True'}
