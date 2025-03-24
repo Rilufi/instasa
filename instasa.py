@@ -10,6 +10,8 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 import random
 import time
 from sys import exit
+from bs4 import BeautifulSoup
+
 
 # Authentication
 api_key = os.environ.get("API_KEY")
@@ -121,20 +123,52 @@ def download_video(link, cookies_content):
         print(f"Erro ao baixar o vídeo: {e}")
         return None
 
+def extract_video_url_from_html(apod_url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(apod_url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Procura por tags de vídeo
+        video_tag = soup.find('video')
+        if video_tag:
+            source = video_tag.find('source')
+            if source and source.get('src'):
+                video_url = source.get('src')
+                # Converte para URL absoluta se necessário
+                if not video_url.startswith('http'):
+                    base_url = 'https://apod.nasa.gov/apod/'
+                    video_url = base_url + video_url
+                return video_url
+        
+        # Procura por iframes do YouTube como fallback
+        iframe = soup.find('iframe')
+        if iframe and 'youtube' in iframe.get('src', ''):
+            return iframe.get('src')
+            
+        return None
+    except Exception as e:
+        print(f"Erro ao extrair URL do vídeo: {e}")
+        return None
+
 def detect_media_type(data):
     media_type = data.get('media_type', '').lower()
-    url = data.get('url', '').lower()
+    url = data.get('url', '')
     
-    # Verificação mais abrangente para vídeos
+    # Caso especial para páginas HTML
+    if url and 'astropix.html' in url:
+        return 'html_video'
+    
+    # Restante da detecção permanece igual...
     if (media_type == 'video' or 
-        any(ext in url for ext in ['.mp4', '.mov', '.avi', '.webm']) or
-        any(domain in url for domain in ['youtube', 'youtu.be', 'vimeo']) or
+        (url and any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm'])) or
         'thumbnail_url' in data):
         return 'video'
     
-    # Verificação para imagens
     if (media_type == 'image' or 
-        any(ext in url for ext in ['.jpg', '.jpeg', '.png', '.gif'])):
+        (url and any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']))):
         return 'image'
     
     return 'other'
@@ -191,19 +225,77 @@ if media_type == 'image':
         print(f"Erro ao processar imagem: {e}")
         bot.send_message(tele_user, f"Erro ao postar imagem: {e}")
 
-elif media_type == 'video':
+elif media_type in ['video', 'direct_video']:
     try:
-        cookies = os.environ.get("COOKIES_CONTENT")
-        if not cookies:
-            raise ValueError("Cookies não encontrados")
-            
-        video_path = download_video(site, cookies)
+        if media_type == 'direct_video':
+            video_path = download_direct_video(site)
+        else:
+            cookies = os.environ.get("COOKIES_CONTENT")
+            if not cookies:
+                raise ValueError("Cookies não encontrados")
+            video_path = download_video(site, cookies)
+        
         if video_path:
+            # Processar vídeo para o Instagram
+            output_path = "instagram_ready.mp4"
+            with VideoFileClip(video_path) as video:
+                duration = min(video.duration, 60)
+                video_cropped = video.subclip(0, duration)
+                video_cropped.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    bitrate="8000k",
+                    fps=30,
+                    preset="fast",
+                    threads=4
+                )
+            
             if instagram_client:
-                post_instagram_video(instagram_client, video_path, insta_string)
+                post_instagram_video(instagram_client, output_path, insta_string)
     except Exception as e:
         print(f"Erro ao processar vídeo: {e}")
-        bot.send_message(tele_user, f"Erro ao postar vídeo: {e}")
+        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {e}')
+
+elif media_type == 'html_video':
+    try:
+        # Extrai a URL real do vídeo da página HTML
+        video_url = extract_video_url_from_html(site)
+        
+        if video_url:
+            print(f"URL do vídeo extraída: {video_url}")
+            
+            if 'youtube' in video_url:
+                # Processa como vídeo do YouTube
+                cookies = os.environ.get("COOKIES_CONTENT")
+                if not cookies:
+                    raise ValueError("Cookies não encontrados")
+                video_path = download_video(video_url, cookies)
+            else:
+                # Processa como vídeo direto
+                video_path = download_direct_video(video_url)
+            
+            if video_path:
+                # Continua com o processamento normal para o Instagram
+                output_path = "instagram_ready.mp4"
+                with VideoFileClip(video_path) as video:
+                    duration = min(video.duration, 60)
+                    video_cropped = video.subclip(0, duration)
+                    video_cropped.write_videofile(
+                        output_path,
+                        codec="libx264",
+                        audio_codec="aac",
+                        fps=30
+                    )
+                
+                if instagram_client:
+                    post_instagram_video(instagram_client, output_path, insta_string)
+        else:
+            raise ValueError("Não foi possível extrair URL do vídeo da página HTML")
+            
+    except Exception as e:
+        print(f"Erro ao processar vídeo HTML: {e}")
+        bot.send_message(tele_user, f'Erro ao processar vídeo da página APOD: {e}')
 
 else:
     msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
