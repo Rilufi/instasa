@@ -152,6 +152,30 @@ def extract_video_url_from_html(apod_url):
     except Exception as e:
         print(f"Erro ao extrair URL do vídeo: {e}")
         return None
+
+def download_direct_video(video_url, filename='apod_direct.mp4'):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        # Verifica se a URL é relativa (começa com /)
+        if video_url.startswith('/'):
+            video_url = f'https://apod.nasa.gov{video_url}'
+        
+        print(f"Tentando baixar vídeo direto de: {video_url}")
+        
+        with requests.get(video_url, stream=True, headers=headers) as r:
+            r.raise_for_status()
+            with open(filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return filename
+    except Exception as e:
+        print(f"Erro ao baixar vídeo direto: {e}")
+        return None
+
+
 def detect_media_type(data):
     media_type = data.get('media_type', '').lower()
     url = data.get('url', '')
@@ -274,44 +298,55 @@ elif media_type in ['video', 'direct_video']:
 
 elif media_type == 'html_video':
     try:
-        # Extrai a URL real do vídeo da página HTML
+        print(f"Processando página HTML do APOD: {site}")
         video_url = extract_video_url_from_html(site)
         
         if video_url:
             print(f"URL do vídeo extraída: {video_url}")
             
             if 'youtube' in video_url:
-                # Processa como vídeo do YouTube
+                print("Detectado vídeo do YouTube")
                 cookies = os.environ.get("COOKIES_CONTENT")
                 if not cookies:
-                    raise ValueError("Cookies não encontrados")
+                    raise ValueError("Cookies do YouTube não encontrados")
                 video_path = download_video(video_url, cookies)
             else:
-                # Processa como vídeo direto
+                print("Detectado vídeo hospedado diretamente")
                 video_path = download_direct_video(video_url)
             
             if video_path:
-                # Continua com o processamento normal para o Instagram
-                output_path = "instagram_ready.mp4"
-                with VideoFileClip(video_path) as video:
-                    duration = min(video.duration, 60)
-                    video_cropped = video.subclip(0, duration)
-                    video_cropped.write_videofile(
-                        output_path,
-                        codec="libx264",
-                        audio_codec="aac",
-                        fps=30
-                    )
+                print(f"Vídeo baixado com sucesso: {video_path}")
                 
-                if instagram_client:
-                    post_instagram_video(instagram_client, output_path, insta_string)
+                # Processar vídeo para o Instagram
+                output_path = "instagram_ready.mp4"
+                try:
+                    with VideoFileClip(video_path) as video:
+                        duration = min(video.duration, 60)
+                        print(f"Duração original: {video.duration}, cortando para: {duration}")
+                        
+                        video_cropped = video.subclip(0, duration)
+                        video_cropped.write_videofile(
+                            output_path,
+                            codec="libx264",
+                            audio_codec="aac",
+                            fps=30,
+                            threads=4
+                        )
+                    
+                    if instagram_client:
+                        print("Enviando vídeo para o Instagram...")
+                        post_instagram_video(instagram_client, output_path, insta_string)
+                except Exception as e:
+                    print(f"Erro ao processar vídeo: {e}")
+                    raise
+            else:
+                raise ValueError("Falha ao baixar o vídeo")
         else:
             raise ValueError("Não foi possível extrair URL do vídeo da página HTML")
             
     except Exception as e:
         print(f"Erro ao processar vídeo HTML: {e}")
-        bot.send_message(tele_user, f'Erro ao processar vídeo da página APOD: {e}')
-
+        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {str(e)}')
 else:
     msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
     print(msg)
