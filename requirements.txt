@@ -2,7 +2,7 @@
 instagrapi
 pyTelegramBotAPI
 google-generativeai
-moviepy>=1.0.3
+moviepy
 pillow
 yt-dlp
 beautifulsoup4
