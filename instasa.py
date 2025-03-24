@@ -72,32 +72,34 @@ def post_instagram_photo(cl, image_path, caption):
 def post_instagram_video(cl, video_path, caption):
     try:
         time.sleep(random.uniform(30, 60))
+        
+        # Verifica a duração do vídeo
         with VideoFileClip(video_path) as video:
-            duration = min(video.duration, 60)
-            if duration < video.duration:
+            duration = video.duration
+            
+            # Se o vídeo já tiver menos de 60s, usa-o diretamente
+            if duration <= 60:
+                output_path = video_path
+            else:
                 output_path = "instagram_video.mp4"
-                video.subclip(0, duration).write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    fps=30
-                )
-                video_path = output_path
+                # Método alternativo para cortar vídeo
+                cmd = f"ffmpeg -i {video_path} -ss 0 -t 60 -c:v libx264 -c:a aac -strict experimental {output_path}"
+                os.system(cmd)
         
         cl.video_upload(
-            video_path,
+            output_path,
             caption=caption,
             extra_data={
-                "configure_mode": 2,  # 2=FEED
+                "configure_mode": 2,
                 "source_type": 4,
                 "video_format": "mp4",
-                "length": duration
+                "length": min(duration, 60)
             }
         )
         print("Vídeo publicado no Instagram")
     except Exception as e:
         print(f"Erro ao postar vídeo no Instagram: {e}")
-        bot.send_message(tele_user, f"apodinsta com problema pra postar vídeo: {e}")
+        bot.send_message(tele_user, f"Erro ao postar vídeo: {e}")
 
 def gerar_traducao(prompt):
     try:
@@ -298,55 +300,36 @@ elif media_type in ['video', 'direct_video']:
 
 elif media_type == 'html_video':
     try:
-        print(f"Processando página HTML do APOD: {site}")
         video_url = extract_video_url_from_html(site)
-        
         if video_url:
             print(f"URL do vídeo extraída: {video_url}")
             
             if 'youtube' in video_url:
-                print("Detectado vídeo do YouTube")
                 cookies = os.environ.get("COOKIES_CONTENT")
                 if not cookies:
-                    raise ValueError("Cookies do YouTube não encontrados")
+                    raise ValueError("Cookies não encontrados")
                 video_path = download_video(video_url, cookies)
             else:
-                print("Detectado vídeo hospedado diretamente")
                 video_path = download_direct_video(video_url)
             
             if video_path:
-                print(f"Vídeo baixado com sucesso: {video_path}")
-                
-                # Processar vídeo para o Instagram
-                output_path = "instagram_ready.mp4"
-                try:
-                    with VideoFileClip(video_path) as video:
-                        duration = min(video.duration, 60)
-                        print(f"Duração original: {video.duration}, cortando para: {duration}")
-                        
-                        video_cropped = video.subclip(0, duration)
-                        video_cropped.write_videofile(
-                            output_path,
-                            codec="libx264",
-                            audio_codec="aac",
-                            fps=30,
-                            threads=4
-                        )
+                # Verifica se o vídeo precisa ser processado
+                with VideoFileClip(video_path) as video:
+                    duration = video.duration
                     
-                    if instagram_client:
-                        print("Enviando vídeo para o Instagram...")
-                        post_instagram_video(instagram_client, output_path, insta_string)
-                except Exception as e:
-                    print(f"Erro ao processar vídeo: {e}")
-                    raise
-            else:
-                raise ValueError("Falha ao baixar o vídeo")
-        else:
-            raise ValueError("Não foi possível extrair URL do vídeo da página HTML")
-            
+                    if duration > 60:
+                        output_path = "instagram_ready.mp4"
+                        # Usa FFmpeg diretamente para cortar
+                        cmd = f"ffmpeg -i {video_path} -ss 0 -t 60 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 128k {output_path}"
+                        os.system(cmd)
+                    else:
+                        output_path = video_path
+                
+                if instagram_client:
+                    post_instagram_video(instagram_client, output_path, insta_string)
     except Exception as e:
-        print(f"Erro ao processar vídeo HTML: {e}")
-        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {str(e)}')
+        print(f"Erro ao processar vídeo: {e}")
+        bot.send_message(tele_user, f'Erro ao processar vídeo: {e}')
 else:
     msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
     print(msg)
