@@ -96,18 +96,19 @@ def process_video_for_instagram(input_path, output_path="instagram_ready.mp4"):
         return output_path
     return None
 
-# Substitua a função upload_video_directly por esta versão atualizada:
+# Substitua a função upload_video_directly por esta versão completa:
 def upload_video_directly(cl, video_path, caption):
     """Upload direto para o Instagram com mock completo do MoviePy"""
     try:
-        # Mock mais completo para enganar todas as verificações
+        # Mock ultra completo com todos os métodos necessários
         class FakeVideoFileClip:
-            def __init__(self, *args, **kwargs):
-                self.filename = args[0] if args else None
-                self.size = (1080, 1920)  # Tamanho esperado pelo Instagram
-                self.duration = 60.0  # Duração padrão
-                self.fps = 30  # FPS padrão
-                self.rotation = 0  # Sem rotação
+            def __init__(self, filename, *args, **kwargs):
+                self.filename = filename
+                self.size = (1080, 1920)
+                self.duration = 60.0
+                self.fps = 30
+                self.rotation = 0
+                self.end = self.duration
             
             def close(self):
                 pass
@@ -117,8 +118,27 @@ def upload_video_directly(cl, video_path, caption):
             
             def __exit__(self, exc_type, exc_val, exc_tb):
                 self.close()
+            
+            def save_frame(self, filename, t=0, withmask=True):
+                # Cria um thumbnail fake usando ffmpeg
+                cmd = [
+                    'ffmpeg',
+                    '-i', self.filename,
+                    '-ss', str(t),
+                    '-vframes', '1',
+                    '-q:v', '2',
+                    filename
+                ]
+                subprocess.run(cmd, check=True)
+                return True
+            
+            def subclip(self, start=0, end=None):
+                end = end or self.duration
+                new_clip = FakeVideoFileClip(self.filename)
+                new_clip.duration = end - start
+                return new_clip
         
-        # Aplica o mock
+        # Aplica o mock completo
         import moviepy.editor
         moviepy.editor.VideoFileClip = FakeVideoFileClip
         
@@ -138,11 +158,16 @@ def upload_video_directly(cl, video_path, caption):
             return True
         except Exception as e:
             print(f"clip_upload falhou, tentando video_upload: {e}")
-            # Fallback para video_upload se clip_upload falhar
+            
+            # Fallback para video_upload com thumbnail gerado pelo nosso mock
+            thumbnail_path = f"{processed_path}.jpg"
+            fake_clip = FakeVideoFileClip(processed_path)
+            fake_clip.save_frame(thumbnail_path)
+            
             video = cl.video_upload(
                 path=processed_path,
                 caption=caption,
-                thumbnail=None
+                thumbnail=thumbnail_path
             )
             print(f"Vídeo postado com sucesso via video_upload! ID: {video.id}")
             return True
