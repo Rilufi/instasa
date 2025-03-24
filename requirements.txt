@@ -5,3 +5,4 @@ google-generativeai
 moviepy>=1.0.3
 pillow
 yt-dlp
+beautifulsoup4
