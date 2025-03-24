@@ -152,6 +152,25 @@ def extract_video_url_from_html(apod_url):
     except Exception as e:
         print(f"Erro ao extrair URL do vídeo: {e}")
         return None
+def detect_media_type(data):
+    media_type = data.get('media_type', '').lower()
+    url = data.get('url', '')
+    
+    # Se for 'other' mas temos uma URL HTML, assumimos que é vídeo
+    if media_type == 'other' and url and ('apod.nasa.gov/apod' in url and '.html' in url):
+        return 'html_video'
+    
+    # Restante da detecção normal...
+    if (media_type == 'video' or 
+        (url and any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm'])) or
+        'thumbnail_url' in data):
+        return 'video'
+    
+    if (media_type == 'image' or 
+        (url and any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']))):
+        return 'image'
+    
+    return 'unsupported'
 
 def debug_api_data(data):
     print("\nDEBUG - Dados da API:")
@@ -196,25 +215,6 @@ except Exception as e:
     bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
     exit()
 
-def detect_media_type(data):
-    media_type = data.get('media_type', '').lower()
-    url = data.get('url', '')
-    
-    # Se for 'other' mas temos uma URL HTML, assumimos que é vídeo
-    if media_type == 'other' and url and ('apod.nasa.gov/apod' in url and '.html' in url):
-        return 'html_video'
-    
-    # Restante da detecção normal...
-    if (media_type == 'video' or 
-        (url and any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.webm'])) or
-        'thumbnail_url' in data):
-        return 'video'
-    
-    if (media_type == 'image' or 
-        (url and any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']))):
-        return 'image'
-    
-    return 'unsupported'
 
 # Gerar legenda
 try:
