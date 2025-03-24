@@ -5,8 +5,9 @@ import requests
 import google.generativeai as genai
 from instagrapi import Client
 import telebot
-from yt_dlp import YoutubeDL  # Substituído pytube por yt-dlp
-from moviepy.video.io.VideoFileClip import VideoFileClip
+from yt_dlp import YoutubeDL
+from moviepy.editor import VideoFileClip
+import random
 import time
 from sys import exit
 
@@ -20,29 +21,25 @@ bot = telebot.TeleBot(TOKEN)
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Choose a GenAI model (e.g., 'gemini-pro')
+# Choose a GenAI model
 model = genai.GenerativeModel('gemini-2.0-flash-lite')
 
-# Função para logar no Instagram com verificação de desafio
 def logar_instagram(username, password, session_file):
     cl = Client()
     try:
         if os.path.exists(session_file):
-            # Carrega a sessão salva
             cl.load_settings(session_file)
         else:
-            # Faz login e salva a sessão
             cl.login(username, password)
             cl.dump_settings(session_file)
             print(f"Sessão salva em {session_file}")
-        cl.get_timeline_feed()  # Verifica se o login foi bem-sucedido
-        return cl  # Retorna o cliente
+        cl.get_timeline_feed()
+        return cl
     except Exception as e:
         print(f"Erro ao logar no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta erro ao logar no Instagram: {e}")
         exit()
 
-# Carrega a sessão a partir do segredo no GitHub Actions
 def load_session_from_secret(secret_name, session_file):
     session_content = os.environ.get(secret_name)
     if session_content:
@@ -52,245 +49,163 @@ def load_session_from_secret(secret_name, session_file):
     else:
         raise ValueError(f"Segredo {secret_name} não encontrado.")
 
-# Nome do arquivo de sessão
 session_file = f"instagram_session_{username}.json"
 load_session_from_secret("INSTAGRAM_SESSION", session_file)
 
-# Tenta fazer login no Instagram
 try:
     instagram_client = logar_instagram(username, password, session_file)
 except Exception as e:
     print(f"Erro ao logar no Instagram: {e}")
     bot.send_message(tele_user, f"Erro ao logar no Instagram: {e}")
 
-# Função para postar foto no Instagram
 def post_instagram_photo(cl, image_path, caption):
     try:
-        time.sleep(random.uniform(30, 60))  # Espera aleatória antes de postar
+        time.sleep(random.uniform(30, 60))
         cl.photo_upload(image_path, caption)
         print("Foto publicada no Instagram")
     except Exception as e:
         print(f"Erro ao postar foto no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta com problema pra postar: {e}")
 
-# Função para postar vídeo no Instagram
-# Função para postar vídeo no Instagram com tratamento melhorado
 def post_instagram_video(cl, video_path, caption):
     try:
         time.sleep(random.uniform(30, 60))
-        
-        # Verifica se o vídeo atende aos requisitos do Instagram
         with VideoFileClip(video_path) as video:
-            duration = video.duration
-            if duration > 60:  # Instagram permite até 60 segundos no feed
-                output_path = "video_instagram.mp4"
-                video_cortado = video.subclip(0, 60)
-                video_cortado.write_videofile(
+            duration = min(video.duration, 60)
+            if duration < video.duration:
+                output_path = "instagram_video.mp4"
+                video.subclip(0, duration).write_videofile(
                     output_path,
                     codec="libx264",
                     audio_codec="aac",
-                    fps=30,
-                    threads=4
+                    fps=30
                 )
                 video_path = output_path
         
-        # Configurações recomendadas para upload no Instagram
         cl.video_upload(
             video_path,
             caption=caption,
-            thumbnail=None,  # Pode adicionar um frame específico como thumbnail
             extra_data={
-                "configure_mode": 1,  # 1=REEL, 2=FEED
-                "source_type": 4,     # 4=Library
+                "configure_mode": 2,  # 2=FEED
+                "source_type": 4,
                 "video_format": "mp4",
-                "length": duration if duration <= 60 else 60
+                "length": duration
             }
         )
         print("Vídeo publicado no Instagram")
     except Exception as e:
         print(f"Erro ao postar vídeo no Instagram: {e}")
         bot.send_message(tele_user, f"apodinsta com problema pra postar vídeo: {e}")
-        raise  # Re-lança a exceção para debug
 
-# Função para gerar conteúdo traduzido usando o modelo GenAI
 def gerar_traducao(prompt):
     try:
         response = model.generate_content(prompt)
-        if response.candidates and len(response.candidates) > 0:
-            if response.candidates[0].content.parts and len(response.candidates[0].content.parts) > 0:
-                return response.candidates[0].content.parts[0].text
-            else:
-                print("Nenhuma parte de conteúdo encontrada na resposta.")
-        else:
-            print("Nenhum candidato válido encontrado.")
+        if response.candidates and response.candidates[0].content.parts:
+            return response.candidates[0].content.parts[0].text
     except Exception as e:
         print(f"Erro ao gerar tradução com o Gemini: {e}")
     return None
 
-# Função para baixar o vídeo usando yt-dlp com cookies
 def download_video(link, cookies_content):
     try:
         ydl_opts = {
-            'format': 'best',  # Baixa o vídeo na melhor qualidade disponível
-            'outtmpl': '%(title)s.%(ext)s',  # Define o nome do arquivo de saída
-            'cookiefile': '-',  # Usa os cookies diretamente da string
+            'format': 'best',
+            'outtmpl': 'apod_video.%(ext)s',
+            'cookiefile': '-',
         }
         with YoutubeDL(ydl_opts) as ydl:
-            # Passa os cookies diretamente como uma string
             ydl.cookiefile = cookies_content
             info_dict = ydl.extract_info(link, download=True)
-            video_filename = ydl.prepare_filename(info_dict)
-            return video_filename
+            return ydl.prepare_filename(info_dict)
     except Exception as e:
         print(f"Erro ao baixar o vídeo: {e}")
         return None
 
-# Função para cortar o vídeo
-def cortar_video(video_path, start_time, end_time, output_path):
-    try:
-        with VideoFileClip(video_path) as video:
-            duration = video.duration
-            if start_time < 0 or end_time > duration:
-                raise ValueError("Os tempos de corte estão fora da duração do vídeo")
-            video_cortado = video.subclip(start_time, end_time)
-            video_cortado.write_videofile(output_path, codec="libx264")
-        return output_path
-    except Exception as e:
-        print(f"Erro ao cortar o vídeo: {e}")
-        return None
-
 def detect_media_type(data):
-    # Primeiro verifica o campo media_type oficial
-    media_type = data.get('media_type', '')
+    media_type = data.get('media_type', '').lower()
+    url = data.get('url', '').lower()
     
-    # Se for um tipo conhecido, retorna
-    if media_type in ['image', 'video']:
-        return media_type
+    # Verificação mais abrangente para vídeos
+    if (media_type == 'video' or 
+        any(ext in url for ext in ['.mp4', '.mov', '.avi', '.webm']) or
+        any(domain in url for domain in ['youtube', 'youtu.be', 'vimeo']) or
+        'thumbnail_url' in data):
+        return 'video'
     
-    # Caso contrário, analisa a URL
-    url = data.get('url', '')
-    if any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif']):
+    # Verificação para imagens
+    if (media_type == 'image' or 
+        any(ext in url for ext in ['.jpg', '.jpeg', '.png', '.gif'])):
         return 'image'
-    elif any(ext in url.lower() for ext in ['.mp4', '.mov', '.avi', '.youtube', 'youtu.be']):
-        return 'video'
-    elif 'thumbnail_url' in data:  # Se tiver thumbnail, provavelmente é vídeo
-        return 'video'
     
     return 'other'
 
-# Get the picture, explanation, and/or video thumbnail
-URL_APOD = "https://api.nasa.gov/planetary/apod"
-params = {
-    'api_key': api_key,
-    'hd': 'True',
-    'thumbs': 'True'
-}
+# Debug: Mostrar dados recebidos da API
+def debug_api_data(data):
+    print("\nDEBUG - Dados da API:")
+    print(f"URL: {data.get('url')}")
+    print(f"Media Type: {data.get('media_type')}")
+    print(f"Thumbnail: {data.get('thumbnail_url')}")
+    print(f"Title: {data.get('title')}")
 
+# Obter dados do APOD
 try:
-    response = requests.get(URL_APOD, params=params)
-    response.raise_for_status()  # Verifica se a requisição foi bem-sucedida
+    response = requests.get("https://api.nasa.gov/planetary/apod", params={
+        'api_key': api_key,
+        'hd': 'True',
+        'thumbs': 'True'
+    })
+    response.raise_for_status()
     data = response.json()
+    debug_api_data(data)  # Debug
+    
     site = data.get('url')
-    thumbs = data.get('thumbnail_url')
-    media_type = data.get('media_type')
+    media_type = detect_media_type(data)
     explanation = data.get('explanation')
     title = data.get('title')
-except requests.exceptions.RequestException as e:
+except Exception as e:
     print(f"Erro ao acessar a API da NASA: {e}")
     bot.send_message(tele_user, f"Erro ao acessar a API da NASA: {e}")
     exit()
-except ValueError as e:
-    print(f"Erro ao decodificar a resposta da API da NASA: {e}")
-    bot.send_message(tele_user, f"Erro ao decodificar a resposta da API da NASA: {e}")
-    exit()
 
-# Combinar o título e a explicação em um único prompt
-prompt_combinado = f"""Given the following scientific text from a reputable source (NASA) in English, translate it accurately and fluently into grammatically correct Brazilian Portuguese while preserving the scientific meaning. Also, based on the following text, create engaging astronomy related hashtags. **Output the translated text and hashtags in a single string, separated by newlines, without headers or subtitles in the following format:**
-[Translated Title]
-[Translated Explanation]
-#Hashtag1 #Hashtag2 #Hashtag3 ...
-
-**Input:**
-{title}
-{explanation}
-"""
-
-# Gerar tradução combinada usando o modelo
+# Gerar legenda
 try:
-    traducao_combinada = gerar_traducao(prompt_combinado)
-    if traducao_combinada:
-        insta_string = f"""Foto Astronômica do Dia
-{title}
+    prompt = f"""Traduza para português brasileiro e adicione hashtags:
+    {title}
+    {explanation}"""
+    
+    traducao = gerar_traducao(prompt) or f"{title}\n\n{explanation}"
+    insta_string = f"Foto Astronômica do Dia\n\n{traducao}"
+except Exception as e:
+    print(f"Erro ao gerar tradução: {e}")
+    insta_string = f"Foto Astronômica do Dia\n\n{title}\n\n{explanation}"
 
-{traducao_combinada}"""
-    else:
-        raise AttributeError("A tradução combinada não foi gerada.")
-except AttributeError as e:
-    print(f"Erro ao gerar a tradução: {e}")
-    insta_string = f"""Foto Astronômica do Dia
-{title}
+print(f"\nLegenda gerada:\n{insta_string}")
 
-{explanation}
-
-#NASA #APOD #Astronomia #Espaço #Astrofotografia"""
-
-print(insta_string)
-
-media_type = detect_media_type(data)
-
+# Processar mídia
 if media_type == 'image':
-    # Retrieve the image
-    urllib.request.urlretrieve(site, 'apodtoday.jpeg')
-    image = "apodtoday.jpeg"
-
-    # Post the image on Instagram
-    if instagram_client:
-        try:
-            post_instagram_photo(instagram_client, image, insta_string)
-        except Exception as e:
-            print(f"Erro ao postar foto no Instagram: {e}")
-            bot.send_message(tele_user, 'apodinsta com problema pra postar imagem')
-
-elif media_type in ['video', 'youtube', 'vimeo', 'gif']:  # Adiciona mais tipos de vídeo
     try:
-        cookies_content = os.environ.get("COOKIES_CONTENT")
-        if not cookies_content:
-            print("Cookies não encontrados nos segredos.")
-            bot.send_message(tele_user, 'Cookies não encontrados nos segredos.')
-            exit()
+        urllib.request.urlretrieve(site, 'apodtoday.jpg')
+        if instagram_client:
+            post_instagram_photo(instagram_client, 'apodtoday.jpg', insta_string)
+    except Exception as e:
+        print(f"Erro ao processar imagem: {e}")
+        bot.send_message(tele_user, f"Erro ao postar imagem: {e}")
 
-        # Baixa o vídeo
-        video_file = download_video(site, cookies_content)
-        
-        if video_file:
-            # Prepara o vídeo para o Instagram
-            output_path = "instagram_ready.mp4"
+elif media_type == 'video':
+    try:
+        cookies = os.environ.get("COOKIES_CONTENT")
+        if not cookies:
+            raise ValueError("Cookies não encontrados")
             
-            with VideoFileClip(video_file) as video:
-                # Reduz a duração para até 60 segundos
-                duration = min(video.duration, 60)
-                
-                # Redimensiona se necessário (Instagram prefere 1080x1350, 1080x1080, ou 1080x1920)
-                video_cropped = video.subclip(0, duration)
-                
-                # Escreve o vídeo no formato adequado
-                video_cropped.write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    bitrate="8000k",
-                    fps=30,
-                    preset="fast",
-                    threads=4
-                )
-            
-            # Posta no Instagram
+        video_path = download_video(site, cookies)
+        if video_path:
             if instagram_client:
-                post_instagram_video(instagram_client, output_path, insta_string)
-                
+                post_instagram_video(instagram_client, video_path, insta_string)
     except Exception as e:
         print(f"Erro ao processar vídeo: {e}")
-        bot.send_message(tele_user, f'Erro ao processar vídeo APOD: {e}')
+        bot.send_message(tele_user, f"Erro ao postar vídeo: {e}")
+
 else:
-    print(f"Tipo de mídia não suportado: {media_type}")
-    bot.send_message(tele_user, f'Tipo de mídia não suportado: {media_type}')
+    msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
+    print(msg)
+    bot.send_message(tele_user, msg)
