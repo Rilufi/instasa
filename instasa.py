@@ -248,19 +248,44 @@ def gerar_traducao(prompt):
         print(f"Erro ao gerar tradução com o Gemini: {e}")
     return None
 
-def download_video(link, cookies_content):
+def download_video(link, cookies_content=None):
     try:
         ydl_opts = {
             'format': 'best',
             'outtmpl': 'apod_video.%(ext)s',
-            'cookiefile': '-',
+            'quiet': True,
+            'no_warnings': True,
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash', 'hls'],
+                    'player_client': ['android', 'web'],
+                }
+            },
+            'referer': 'https://www.youtube.com/',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        
+        # Se cookies_content foi fornecido, escrever em um arquivo temporário
+        if cookies_content:
+            with open('temp_cookies.txt', 'w') as f:
+                f.write(cookies_content)
+            ydl_opts['cookiefile'] = 'temp_cookies.txt'
+        
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.cookiefile = cookies_content
             info_dict = ydl.extract_info(link, download=True)
-            return ydl.prepare_filename(info_dict)
+            filename = ydl.prepare_filename(info_dict)
+            
+            # Limpar arquivo temporário se existir
+            if os.path.exists('temp_cookies.txt'):
+                os.remove('temp_cookies.txt')
+                
+            return filename
     except Exception as e:
         print(f"Erro ao baixar o vídeo: {e}")
+        # Limpar arquivo temporário se existir
+        if os.path.exists('temp_cookies.txt'):
+            os.remove('temp_cookies.txt')
         return None
 
 def extract_video_url_from_html(apod_url):
