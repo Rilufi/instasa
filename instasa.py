@@ -250,12 +250,12 @@ def gerar_traducao(prompt):
 
 def download_video(link, cookies_content=None):
     try:
+        # Opções principais do yt-dlp
         ydl_opts = {
-            'format': 'best',
+            'format': 'best[height<=720]',  # Limita a 720p para evitar problemas
             'outtmpl': 'apod_video.%(ext)s',
             'quiet': True,
             'no_warnings': True,
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
             'extractor_args': {
                 'youtube': {
                     'skip': ['dash', 'hls'],
@@ -263,29 +263,60 @@ def download_video(link, cookies_content=None):
                 }
             },
             'referer': 'https://www.youtube.com/',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'retries': 10,
+            'fragment_retries': 10,
+            'extract_flat': False,
+            'ignoreerrors': True,
         }
-        
-        # Se cookies_content foi fornecido, escrever em um arquivo temporário
+
+        # Tratamento dos cookies
+        cookies_file = None
         if cookies_content:
-            with open('temp_cookies.txt', 'w') as f:
-                f.write(cookies_content)
-            ydl_opts['cookiefile'] = 'temp_cookies.txt'
-        
-        with YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(link, download=True)
-            filename = ydl.prepare_filename(info_dict)
-            
-            # Limpar arquivo temporário se existir
-            if os.path.exists('temp_cookies.txt'):
-                os.remove('temp_cookies.txt')
+            try:
+                # Verifica se os cookies estão em formato Netscape
+                if "youtube.com" in cookies_content and "HTTP" in cookies_content:
+                    cookies_file = "youtube_cookies.txt"
+                    with open(cookies_file, "w") as f:
+                        f.write(cookies_content)
+                else:
+                    # Assume formato JSON
+                    cookies_file = "youtube_cookies.json"
+                    with open(cookies_file, "w") as f:
+                        json.dump(json.loads(cookies_content), f)
                 
-            return filename
+                ydl_opts['cookiefile'] = cookies_file
+            except Exception as e:
+                print(f"Erro ao processar cookies: {e}")
+                if os.path.exists(cookies_file):
+                    os.remove(cookies_file)
+                cookies_file = None
+
+        with YoutubeDL(ydl_opts) as ydl:
+            # Primeira tentativa com todas as opções
+            try:
+                info_dict = ydl.extract_info(link, download=True)
+                filename = ydl.prepare_filename(info_dict)
+                return filename
+            except Exception as e:
+                print(f"Primeira tentativa falhou: {e}")
+                # Fallback: tenta sem cookies e com user-agent diferente
+                if cookies_file and os.path.exists(cookies_file):
+                    os.remove(cookies_file)
+                
+                ydl_opts.update({
+                    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36',
+                    'cookiefile': None
+                })
+                info_dict = ydl.extract_info(link, download=True)
+                filename = ydl.prepare_filename(info_dict)
+                return filename
+
     except Exception as e:
-        print(f"Erro ao baixar o vídeo: {e}")
-        # Limpar arquivo temporário se existir
-        if os.path.exists('temp_cookies.txt'):
-            os.remove('temp_cookies.txt')
+        print(f"Erro ao baixar o vídeo: {str(e)}")
+        # Limpeza de arquivos temporários
+        if 'cookies_file' in locals() and cookies_file and os.path.exists(cookies_file):
+            os.remove(cookies_file)
         return None
 
 def extract_video_url_from_html(apod_url):
@@ -390,17 +421,79 @@ try:
             post_instagram_photo(instagram_client, 'apodtoday.jpg', insta_string)
     
     elif media_type in ['video', 'html_video']:
-        video_url = site if media_type == 'video' else extract_video_url_from_html(site)
-        
-        if video_url:
-            if 'youtube' in video_url:
-                cookies = os.environ.get("COOKIES_CONTENT")
-                video_path = download_video(video_url, cookies) if cookies else None
-            else:
-                video_path = download_direct_video(video_url)
+      video_url = site if media_type == 'video' else extract_video_url_from_html(site)
+    
+      if video_url:
+        if 'youtube' in video_url:
+            print(f"Tentando baixar vídeo do YouTube: {video_url}")
+            cookies = os.environ.get("COOKIES_CONTENT")
             
-            if video_path and instagram_client:
-                upload_video_directly(instagram_client, video_path, insta_string)
+            # Tentativa 1: Com cookies
+            video_path = download_video(video_url, cookies)
+            
+            # Tentativa 2: Sem cookies se falhar
+            if not video_path:
+                print("Tentando sem cookies...")
+                video_path = download_video(video_url)
+            
+            # Tentativa 3: Método alternativo se ainda falhar
+            if not video_path:
+                print("Tentando método alternativo...")
+                try:
+                    video_id = None
+                    if 'embed/' in video_url:
+                        video_id = video_url.split('embed/')[1].split('?')[0]
+                    elif 'v=' in video_url:
+                        video_id = video_url.split('v=')[1].split('&')[0]
+                    
+                    if video_id:
+                        # Tenta baixar apenas o áudio e depois combinar com thumbnail
+                        ydl_opts = {
+                            'format': 'bestaudio/best',
+                            'outtmpl': f'apod_audio.%(ext)s',
+                            'postprocessors': [{
+                                'key': 'FFmpegVideoConvertor',
+                                'preferedformat': 'mp4',
+                            }],
+                        }
+                        with YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([f'https://www.youtube.com/watch?v={video_id}'])
+                        
+                        # Baixa a thumbnail
+                        thumbnail_url = f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg'
+                        urllib.request.urlretrieve(thumbnail_url, 'apod_thumbnail.jpg')
+                        
+                        # Combina áudio e thumbnail (cria vídeo estático)
+                        cmd = [
+                            'ffmpeg',
+                            '-loop', '1',
+                            '-i', 'apod_thumbnail.jpg',
+                            '-i', 'apod_audio.m4a',
+                            '-c:v', 'libx264',
+                            '-tune', 'stillimage',
+                            '-c:a', 'aac',
+                            '-b:a', '192k',
+                            '-pix_fmt', 'yuv420p',
+                            '-shortest',
+                            '-y',
+                            'apod_video.mp4'
+                        ]
+                        if run_ffmpeg_command(cmd):
+                            video_path = 'apod_video.mp4'
+                except Exception as e:
+                    print(f"Erro no método alternativo: {e}")
+        else:
+            video_path = download_direct_video(video_url)
+        
+        if video_path and instagram_client:
+            if upload_video_directly(instagram_client, video_path, insta_string):
+                print("Vídeo postado com sucesso!")
+            else:
+                print("Falha ao postar vídeo")
+                bot.send_message(tele_user, "Falha ao postar vídeo no Instagram")
+        elif not video_path:
+            print("Não foi possível baixar o vídeo")
+            bot.send_message(tele_user, f"Não foi possível baixar o vídeo: {video_url}")
     
     else:
         msg = f"Tipo de mídia não suportado: {media_type}\nURL: {site}"
