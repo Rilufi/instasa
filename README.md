@@ -1,64 +1,93 @@
-# instasa
+# 📸 Instasa - Bot da NASA no Instagram 🇧🇷
 
-Bot em Python para postar a Astronomy Picture of the Day no Instagram usando a API da NASA.
+Bot em Python para postar automaticamente a "Astronomy Picture of the Day" (APOD) da NASA no Instagram.
 
-## Instalações
-Todos os pacotes necessários estão listados em `requirements.txt`. Você pode instalá-los usando:
-
+## 📦 Instalação
 ```
-$ pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
+## 🔑 Configuração Necessária
+1. **NASA API**:
+   - Obtenha uma chave em: [api.nasa.gov](https://api.nasa.gov/)
+   - Adicione no arquivo `auth.py` como `nasa_key`
 
-## NASA API
-É necessário solicitar uma chave para a API da NASA visitando o site e preenchendo seu nome e e-mail em "Generate API Keys" em [NASA API](https://api.nasa.gov/). Não se esqueça de incluir essa chave em `auth.py` sob `nasa_key`.
+2. **Google Generative AI**:
+   - Requer chave de API para traduções
+   - Configure como variável de ambiente `GOOGLE_API_KEY`
 
-## Google Generative AI
-Para usar a Google Generative AI para traduções, você precisa de uma chave de API. Configure a chave da API nas variáveis de ambiente como `GOOGLE_API_KEY`.
+3. **Instagram**:
+   - Use o pacote `instagrapi`
+   - Configure credenciais no arquivo `auth.py`
 
-## Instagram API
-Para postar no Instagram, use o pacote `instagrapi`. Certifique-se de fornecer suas credenciais do Instagram nas variáveis de ambiente.
+## 🌟 Funcionalidades
+- Posta automaticamente a APOD diária
+- Processa tanto imagens quanto vídeos
+- Traduz legendas (inglês → português) usando IA
+- Sistemas alternativos para quando o upload falha
+- Suporte a vídeos do YouTube incorporados
 
-## O que o bot faz?
-- **Posta a Astronomy Picture of the Day**: Recupera a APOD da API da NASA e posta no Instagram.
-- **Reposta a foto do dia anterior da NASA no Instagram**: Baixa a foto mais recente do Instagram de contas oficiais da NASA e posta no Instagram com a legenda traduzida.
-- **Manipula diferentes tipos de mídia**: Suporta a postagem de imagens e vídeos, incluindo o processamento de vídeos para limites de duração.
-- 
-## Uso
-O bot pode ser executado com o script principal "nasapod.py" que lida com todo o processo de buscar dados, processá-los e postá-los nas plataformas de mídia social.
+## ⚠️ Desafios Conhecidos
+- Limitações da API não oficial do Instagram
+- Requer autenticação manual periódica
+- Restrições de upload de vídeo (60s máximo)
 
-## Verificar os resultados
-Para ver o bot em ação, confira [Apodinsta no Instagram](https://www.instagram.com/apodinsta/).
-
----
-
-# nasapod
-
-Python bot to post the Astronomy Picture of the Day on Instagram using the NASA API.
-
-## Installations
-All required packages are listed in `requirements.txt`. You can install them using:
-
+## 🏃‍♂️ Como Usar
+1. Configure todas as chaves API
+2. Execute o script principal:
 ```
-$ pip install -r requirements.txt
+python instasa.py
 ```
 
-## NASA API
-You need to request a key for the NASA API by visiting the website and filling in your name and email under "Generate API Keys" at [NASA API](https://api.nasa.gov/). Don't forget to include this key in `auth.py` under `nasa_key`.
+## 📫 Contato
+- Criado por Yuri Abuchaim
+- [Instagram @apodinsta](https://instagram.com/apodinsta)
+- yuri.abuchaim@gmail.com
 
-## Google Generative AI
-To use the Google Generative AI for translations, you need an API key. Configure the API key in your environment variables as `GOOGLE_API_KEY`.
+===========================================
 
-## Instagram API
-To post on Instagram, use the `instagrapi` package. Make sure to provide your Instagram credentials in the environment variables.
+# 📸 Instasa - Instagram NASA Bot 🇺🇸
 
-## What does the bot do?
-- **Posts the Astronomy Picture of the Day**: Retrieves the APOD from the NASA API and posts it on Instagram.
-- **Reposts NASA's Instagram photo of the previous day **: Downloads the latest photo from NASA's official Instagram accounts and posts it on Instagram with a translated caption.
-- **Handles different media types**: Supports posting images and videos, including video processing for Twitter's duration limits.
+Python bot to automatically post NASA's Astronomy Picture of the Day (APOD) on Instagram.
 
-## Usage
-The bot can be run with the main script "instasa.py" which handles the entire process of fetching data, processing it, and posting it to social media platforms.
+## 📦 Installation
+```
+pip install -r requirements.txt
+```
 
-## Check the results
-To see the bot in action, check out [Apodinsta on Instagram](https://www.instagram.com/apodinsta/).
+## 🔑 Required Setup
+1. **NASA API**:
+   - Get a key at: [api.nasa.gov](https://api.nasa.gov/)
+   - Add to `auth.py` as `nasa_key`
+
+2. **Google Generative AI**:
+   - Requires API key for translations
+   - Set as environment variable `GOOGLE_API_KEY`
+
+3. **Instagram**:
+   - Use the `instagrapi` package
+   - Configure credentials in `auth.py`
+
+## 🌟 Features
+- Automatically posts daily APOD
+- Processes both images and videos
+- Translates captions (EN → PT) using AI
+- Fallback systems for failed uploads
+- Supports embedded YouTube videos
+
+## ⚠️ Known Challenges
+- Limitations of unofficial Instagram API
+- Requires periodic manual authentication
+- Video upload restrictions (60s max)
+
+## 🏃‍♂️ How to Use
+1. Configure all API keys
+2. Run main script:
+```
+python instasa.py
+```
+
+## 📫 Contact
+- Created by Yuri Abuchaim
+- [Instagram @apodinsta](https://instagram.com/apodinsta)
+- yuri.abuchaim@gmail.com
